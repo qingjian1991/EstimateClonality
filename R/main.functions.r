@@ -1,5 +1,8 @@
 #### Functions for cancer cell fraction estimation #####
 
+#' identify.mut.copy.number.ascat
+#' 
+#' @export
 identify.mut.copy.number.ascat <- function(x, sub.mat.mut, sub.mat.copy) {
   mut <- sub.mat.mut[x, , drop = FALSE]
   ww <- which(as.numeric(sub.mat.copy$Chr) == as.numeric(mut$Chr)
@@ -17,8 +20,9 @@ identify.mut.copy.number.ascat <- function(x, sub.mat.mut, sub.mat.copy) {
   Alternate_Base <- mut$Alternate
 
   if (nrow(copy) != 1) {
-    minor_cn <- NA
-    major_cn <- NA
+    #When mutations are not overlapped with cnvs, set the mutations neutrals.
+    minor_cn <- 1
+    major_cn <- 1
     output <- data.frame(mutation_id,
       ref_counts,
       var_counts,
@@ -395,6 +399,8 @@ identify.mut.copy.number.ascat <- function(x, sub.mat.mut, sub.mat.copy) {
 #   return(out)
 # }
 
+#' earlyORlate.strict
+#' @export
 earlyORlate.strict <- function(patient, complete.mutation.table, purity) {
 
   # The following function is very similar indeed to the function above
@@ -648,6 +654,10 @@ earlyORlate.strict <- function(patient, complete.mutation.table, purity) {
 
 
 #### Plotting ######
+
+
+#' plot.EarlyOrLate
+#' @export
 plot.EarlyOrLate <- function(seg.mat.patient,
                              TCGA.earlyLate,
                              TCGA.purity,
@@ -881,7 +891,8 @@ plot.EarlyOrLate <- function(seg.mat.patient,
 
 #########################################################################################
 
-
+#' fun.chrom.length
+#' @export
 fun.chrom.length <- function(seg) {
   # This function returns the length of chromosome 1,...,22
   # seg: first three columns of the minimum conistent region matrix
@@ -896,6 +907,8 @@ fun.chrom.length <- function(seg) {
 
 #############################################################################################
 
+#' fun.add.chrom
+#' @export
 fun.add.chrom <- function(seg, chrom.length) {
   # This function adds the length of chromosome 1,...,(i - 1) to chromsomes 2,...,22
   # seg: first three columns of the minimum conistent region matrix
@@ -926,6 +939,8 @@ fun.add.chrom <- function(seg, chrom.length) {
 
 ####################################################################################################
 
+#' fun.smooth.score
+#' @export
 fun.smooth.score <- function(score, seg) {
   # This function applies smoothing (rollmean) to chromosome 1,...,22 separetely
   # score: score to be smoothed (e.g. correlation)
@@ -942,7 +957,8 @@ fun.smooth.score <- function(score, seg) {
 }
 
 #######################################################################################################
-
+#' fun.chrom.mean
+#' @export 
 fun.chrom.mean <- function(seg) {
   # This function finds the middle of the positions for each chromosome.
   # seg: Matrix with three columns, containing the positions.
@@ -956,7 +972,8 @@ fun.chrom.mean <- function(seg) {
 
 #######################################################################################################
 
-
+#' plot.TCGA.sample.ccfs
+#' @export
 plot.TCGA.sample.ccfs <- function(TCGA.earlyLate,
                                   clonal.cut.off = 1,
                                   spec.genes = NULL) {

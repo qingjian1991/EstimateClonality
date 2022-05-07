@@ -2,7 +2,8 @@
 % Please edit documentation in R/GD.functions.R
 \name{genome.doub.sig}
 \alias{genome.doub.sig}
-\title{Genome Doubling function}
+\title{genome.doub.sig
+Genome Doubling function}
 \usage{
 genome.doub.sig(sample, seg.mat.minor, seg.mat.copy, number.of.sim = 10000)
 }

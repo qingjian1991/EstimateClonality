@@ -5,6 +5,12 @@ Author: Nicholas McGranahan
 Description: Uses read count and copy number information to temporally and clonally dissect SNVs.
 Maintainer: Nicholas McGranahan <nicholas.mcgranahan@cancer.org.uk>
 License: GPL-3
-Depends: gdata, limma, sequenza, boot, bootstrap
-Packaged: 2020-11-04; B Niu
-RoxygenNote: 7.1.1
+Depends:
+  R (>= 4.0),
+  gdata, 
+  limma, 
+  sequenza, 
+  boot, 
+  bootstrap
+Packaged: 2022-5-7; Qingjian Chen
+RoxygenNote: 7.1.2

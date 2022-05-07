@@ -2,7 +2,8 @@
 % Please edit documentation in R/earlyORlate.R
 \name{earlyORlate}
 \alias{earlyORlate}
-\title{Clonal and temporal dissection}
+\title{earlyORlate
+Clonal and temporal dissection}
 \usage{
 earlyORlate(patient, complete.mutation.table, purity)
 }

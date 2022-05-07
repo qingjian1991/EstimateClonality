@@ -9,6 +9,66 @@
 suppressPackageStartupMessages(library(gdata))
 suppressPackageStartupMessages(library(limma))
 suppressPackageStartupMessages(library(sequenza))
+
+#' clonality.estimation
+#' clonality.estimation integrates the read depth and copy number information at single nucleotide variant locations to determine the timing and clonality of each mutation.
+#' @usage clonality.estimation(mutation.table.loc, seg.mat.loc, data.type, TCGA.barcode, ANALYSIS.DIR, sub.clonal.cut.off = 1, min.var.prop = 0.05, min.alt.reads = 5, min.depth = 30, plotting = TRUE)
+#' @param mutation.table.loc The location of a mutation table. 
+#'    The table should contain the following columns:
+#'                      c('Patient'
+#'                      ,'Chr'
+#'                      ,'Start_position'
+#'                      ,'End_position'
+#'                      ,'Reference'
+#'                      ,'Alternate'
+#'                      ,'Variant_freq'
+#'                      ,'Ref_freq'
+#'                      ,'Hugo_Symbol'
+#'                      ,'Variant_Classification')
+#' @param seg.mat.loc The location of a segmented matrix (in RData format). This should be in the format of a list. 
+#' @param data.type Data type, e.g. TCGA_BRCA
+#' @param TCGA.barcode Sample identifier, e.g. 'TCGA-AN-A0FF'
+#' @param ANALYSIS.DIR Where do you want the folders to be saved?
+#' @param sub.clonal.cut.off What cut off should be used for the subclonal fraction, defaults to 1 (i.e. 95\% CI overlaps 1)
+#' @param min.var.prop Minimum variant proportion (defaults to 0.05)
+#' @param min.alt.reads Minimum number of alternate reads (defaults to 5)
+#' @param min.depth Minimum depth at mutated base (defaults to 30)
+#' @param plotting Do you want plotting? (defaults to TRUE)
+#' 
+#' @details
+#' 
+#' Nothing is returned directly. However, three files (if plotting TRUE) should be returned within a folder in the specified directory. Patient.earlylate.tsv is a tab-separated table that contains a number of columns. Description of the columns is as follows:
+#' [1] "patient"  #Patient identifier;
+#' [2] "TCGA.purity"  # ASCAT tumor purity estimate;
+#' [3] "mutation_id" # mutation id;
+#' [4] "Reference_Base" # reference base; 
+#' [5] "Alternate_Base" # alternate base;
+#' [6] "ref_counts" # number of reads supporting reference base;
+#' [7] "var_counts" # number of reads supporting variant base;
+#' [8] "obs.VAF" # observed variant allele frequency;
+#' [9] "normal_cn" # local normal copy number at mutation site;
+#' [10] "minor_cn" # local minor allele copy number at mutation site;
+#'[11] "major_cn" # local major allele copy number at mutation site;
+#' [12] "mut.multi" # mutation multiplicity (number of copies of mutant allele);
+#'[13] "absolute.ccf" # estimated cancer cell fraction;
+#'[14] "absolute.ccf.0.05" # CI of ccf;
+#'[15] "absolute.ccf.0.95" # CI of ccf;
+#'[16] "prob.clonal";      
+#'[17] "prob.subclonal";    
+#'[18] "GD.status";        
+#'[19] "timing" # timing based on copy number;
+#'[20] "comb.timing" # timing based on clonality and copy number;
+#' @examples 
+#' 
+#' clonality.estimation(mutation.table.loc="BRCA.mutation.table.txt"
+#'                     ,seg.mat.loc="tcga.brca.seg.hg19.rdata"
+#'                     ,data.type='TCGA_BRCA'
+#'                     ,TCGA.barcode="TCGA-AR-A2LR"
+#'                     ,ANALYSIS.DIR="example/")
+#' 
+#' @export
+
+
 clonality.estimation <- function(mutation.table.loc,
                                  seg.mat.loc,
                                  data.type,
@@ -33,7 +93,7 @@ clonality.estimation <- function(mutation.table.loc,
   if (!file.exists(data.folder)) {
     if (!dir.create(data.folder, recursive = TRUE)) {
       stop("Unable to create root directory.\n")
-    }
+    } 
   }
 
   # create a folder for the specific patient
@@ -167,15 +227,36 @@ clonality.estimation <- function(mutation.table.loc,
 
   colnames(sub.mat.cn) <- c("Sample", "Chrom", "Start", "End", "Num.probes", "val")
 
-  GD.pval <- genome.doub.sig(
+  GD <- genome.doub.sig(
     sample = TCGA.barcode, seg.mat.minor = sub.mat.minor,
     seg.mat.copy = sub.mat.cn, number.of.sim = 10000
   )
+  
+  
   GD.status <- fun.GD.status(
-    GD.pval = GD.pval,
+    GD.pval = GD$pval,
     ploidy.val = round(sub.mat.copy$Ploidy[1])
   )
-
+  
+  GD.pval = GD$pval
+  
+  #write.GD
+  GD.tsv <- paste(patient.folder, "/", TCGA.barcode, ".GD.tsv", sep = "")
+  GD.out <- data.frame(
+    patient = TCGA.barcode,
+    prop.major.even.obs = round(GD$prop.major.even.obs,4),
+    ploidy = round(sub.mat.copy$Ploidy[1], 3),
+    GD.pval = GD$pval
+    
+  )
+  
+  write.table(GD.out,
+              sep = "\t",
+              quote = FALSE,
+              col.names = TRUE,
+              row.names = FALSE,
+              file = GD.tsv
+  )
 
   TCGA.purity <- as.character(unique(sub.mat.copy[, grep("Aberrant", colnames(sub.mat.copy))]))
 
@@ -188,13 +269,21 @@ clonality.estimation <- function(mutation.table.loc,
 
   TCGA.earlyLate <- earlyORlate(patient = TCGA.barcode, complete.mutation.table = mut.table, purity = TCGA.purity)
   TCGA.earlyLate <- cbind(TCGA.earlyLate, GD.pval, GD.status, TCGA.purity)
+  
+  # removing NA's data.
+  if( any(is.na(TCGA.earlyLate$ccf)) ){
+    message("Removing NA's: ", sum(is.na(TCGA.earlyLate$ccf)) )
+    TCGA.earlyLate = TCGA.earlyLate[ !is.na(TCGA.earlyLate$ccf) ,]
+  }
+
+
 
   # Let's choose the columns of interest
   TCGA.earlyLate.out <- TCGA.earlyLate
   TCGA.earlyLate.out$comb.timing <- NA
   TCGA.earlyLate.out[TCGA.earlyLate.out$absolute.ccf.0.95 >= sub.clonal.cut.off & !TCGA.earlyLate.out$timing %in% c("late"), "comb.timing"] <- "Early"
   TCGA.earlyLate.out[TCGA.earlyLate.out$absolute.ccf.0.95 < sub.clonal.cut.off | TCGA.earlyLate.out$timing %in% c("late"), "comb.timing"] <- "Late"
-  col.names <- c("patient", "TCGA.purity", "mutation_id", "Reference_Base", "Alternate_Base", "ref_counts", "var_counts", "obs.VAF", "normal_cn", "minor_cn", "major_cn", "mut.multi", "absolute.ccf", "absolute.ccf.0.05", "absolute.ccf.0.95", "prob.clonal", "prob.subclonal", "GD.status", "timing", "comb.timing")
+  col.names <- c("patient", "TCGA.purity", "mutation_id", "Reference_Base", "Alternate_Base", "ref_counts", "var_counts", "obs.VAF", "normal_cn", "minor_cn", "major_cn", "mut.multi", "Exp.Cpn", "Exp.Cpn.Likelihood", "absolute.ccf", "absolute.ccf.0.05", "absolute.ccf.0.95", "prob.clonal", "prob.subclonal", "GD.status", "timing", "comb.timing")
 
   TCGA.earlyLate.out <- TCGA.earlyLate.out[, col.names]
 

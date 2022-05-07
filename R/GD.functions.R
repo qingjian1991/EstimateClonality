@@ -12,6 +12,7 @@
 # 
 # According to the code of clonality.estimation(), "val" means "cn".
 
+#' genome.doub.sig
 #' Genome Doubling function
 #'
 #' @param sample TCGA sample identifier
@@ -145,7 +146,9 @@ genome.doub.sig <- function(sample, seg.mat.minor, seg.mat.copy, number.of.sim =
 
       chr.probs <- c(chr.probs, chr.prob)
     }
-
+    
+    
+    #The observed proportion of chromosome arms with a major allele copy number (MCN) >=2 (duplicated genomes)
     prop.major.even.obs <- length(which(chr.arm.ploidy.major >= 2)) / length(chr.arm.ploidy.major)
     # should probably set something as prop.major.even.obs p.val =0.001
 
@@ -166,6 +169,13 @@ genome.doub.sig <- function(sample, seg.mat.minor, seg.mat.copy, number.of.sim =
 
       rownames(chr.sim.table) <- chr.names
       colnames(chr.sim.table) <- c("gain.A", "loss.A", "gain.B", "loss.B")
+      
+      #       gain.A  loss.A  gain.B  loss.B
+      #1        0      0      0       0
+      #1.5      2      0      1       0
+      #2        0      0      1       0
+      
+      #Get the simulated majors.
       chr.sim.major <- apply(cbind(
         c(1 + chr.sim.table[, 1] - chr.sim.table[, 2]),
         c(1 + chr.sim.table[, 3] - chr.sim.table[, 4])
@@ -185,12 +195,30 @@ genome.doub.sig <- function(sample, seg.mat.minor, seg.mat.copy, number.of.sim =
       p.val.genome.doubl <- 0
     }
   }
-
-  # return single p.val
-  return(p.val.genome.doubl)
+  
+  if (sum(total.aber) != 0) {
+      list(
+        prop.major.even.sim = prop.major.even.sim,
+        prop.major.even.obs = prop.major.even.obs,
+        pval = p.val.genome.doubl
+      )
+    
+  }else{
+      list(
+        prop.major.even.sim = NA,
+        prop.major.even.obs = 0,
+        pval = 0
+      )
+    
+  }
+  
+  
+  
 }
 
-
+#' fun.GD.status
+#' 
+#' @export
 fun.GD.status <- function(GD.pval, ploidy.val) {
   GD.status <- c(NA)
 
@@ -232,6 +260,9 @@ fun.GD.status <- function(GD.pval, ploidy.val) {
 ## get seg.mat.copy ###################
 ###########################################
 
+#' get.seg.mat.arm
+#' 
+#' @export
 
 get.seg.mat.arm <- function(seg.mat.copy) {
   data(centromere)
