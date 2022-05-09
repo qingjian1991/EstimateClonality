@@ -246,7 +246,8 @@ clonality.estimation <- function(mutation.table.loc,
     patient = TCGA.barcode,
     prop.major.even.obs = round(GD$prop.major.even.obs,4),
     ploidy = round(sub.mat.copy$Ploidy[1], 3),
-    GD.pval = GD$pval
+    GD.pval = GD$pval,
+    GD.status = GD.status
     
   )
   

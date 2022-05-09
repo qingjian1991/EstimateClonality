@@ -207,7 +207,7 @@ genome.doub.sig <- function(sample, seg.mat.minor, seg.mat.copy, number.of.sim =
       list(
         prop.major.even.sim = NA,
         prop.major.even.obs = 0,
-        pval = 0
+        pval = 1
       )
     
   }
