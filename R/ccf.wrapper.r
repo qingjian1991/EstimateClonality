@@ -232,7 +232,6 @@ clonality.estimation <- function(mutation.table.loc,
     seg.mat.copy = sub.mat.cn, number.of.sim = 10000
   )
   
-  
   GD.status <- fun.GD.status(
     GD.pval = GD$pval,
     ploidy.val = round(sub.mat.copy$Ploidy[1])
@@ -258,7 +257,24 @@ clonality.estimation <- function(mutation.table.loc,
               row.names = FALSE,
               file = GD.tsv
   )
-
+  
+  # Timing the GD.
+  GD.time <- genome.doub.timing(sample = TCGA.barcode, seg.mat.minor = sub.mat.minor,
+                     seg.mat.copy = sub.mat.cn, loss.level = 3)
+  
+  #write chromosomal arm levels status.
+  write.table(GD.time$sub.mat.arms,
+              sep = "\t", quote = FALSE,col.names = TRUE, row.names = FALSE,
+              file = paste(patient.folder, "/", TCGA.barcode, ".arms.tsv", sep = "")
+  )
+  
+  #write chromosomal arm levels status.
+  write.table(GD.time$GD.timing,
+              sep = "\t", quote = FALSE,col.names = TRUE, row.names = FALSE,
+              file = paste(patient.folder, "/", TCGA.barcode, ".GD.Timing.tsv", sep = "")
+  )
+  
+  
   TCGA.purity <- as.character(unique(sub.mat.copy[, grep("Aberrant", colnames(sub.mat.copy))]))
 
   if (TCGA.purity > 1) {

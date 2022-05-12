@@ -13,18 +13,19 @@
 # According to the code of clonality.estimation(), "val" means "cn".
 
 #' genome.doub.sig
-#' Genome Doubling function
-#'
 #' @param sample TCGA sample identifier
-#' @param seg.mat.minor segmented minor allele copy number matrix
-#' @param seg.mat.copy segmented total copy number matrix
+#' @param seg.mat.minor segmented minor allele copy number matrix. segmented matrix with minor allele (e.g. seg.mat.LOH). columns should be as follows: c("Sample","Chrom","Start","End","Num.probes","val")
+#' @param seg.mat.copy segmented total copy number matrix. segmented total copy number matrix (columns as above)
 #' @param number.of.sim The number of simulations to assess genome doubling likelihood, defaults to 10,000
 #' @description 
 #' The following function estimates the probability that a genome doubling has
-#' occured at some point during the evolutionary history of a tumour.
+#' occured at some point during the evolutionary history of a tumour. This function is to assess significance as to whether sample appears to have undergone genome doubling.
+#' 
 #' @details 
-#' According to the code of clonality.estimation(), "val" means "cn".
+#' According to the code of clonality.estimation(), "val" means "cn". the function uses the limma weighted.median function
 #' @return
+#' the function returns a p.val for every sample
+#' 
 #' @export
 #'
 #' @examples
@@ -197,6 +198,7 @@ genome.doub.sig <- function(sample, seg.mat.minor, seg.mat.copy, number.of.sim =
   }
   
   if (sum(total.aber) != 0) {
+    
       list(
         prop.major.even.sim = prop.major.even.sim,
         prop.major.even.obs = prop.major.even.obs,
@@ -204,16 +206,14 @@ genome.doub.sig <- function(sample, seg.mat.minor, seg.mat.copy, number.of.sim =
       )
     
   }else{
-      list(
+    
+    list(
         prop.major.even.sim = NA,
         prop.major.even.obs = 0,
         pval = 1
       )
     
   }
-  
-  
-  
 }
 
 #' fun.GD.status
@@ -253,6 +253,178 @@ fun.GD.status <- function(GD.pval, ploidy.val) {
 
   return(GD.status)
 }
+
+
+
+
+#' genome.doub.timing
+#' 
+#' Function to assess the timing of GD relative to the genome loss. Some genotypes are happened before GD (AA or AAA) whereas the other are after GD (AAB and AB)
+#'
+#' @param sample TCGA sample identifier
+#' @param seg.mat.minor segmented minor allele copy number matrix. segmented matrix with minor allele (e.g. seg.mat.LOH). columns should be as follows: c("Sample","Chrom","Start","End","Num.probes","val")
+#' @param seg.mat.copy segmented total copy number matrix. segmented total copy number matrix (columns as above)
+#' @param loss.level The cnv loss types to use. 2 or 3. If loss.level == 2, genotypes, AA and AB are used, if loss.level == 3, genotypes: AA, AB, AAB and AAA are used.
+#' 
+#' @details 
+#' According to the code of clonality.estimation(), "val" means "cn". the function uses the limma weighted.median function
+#' 
+#' @return
+#' the function returns a GD.timing dataframe and the information of arm levels.
+#' 
+#' @export
+#' 
+#' @importFrom magrittr %>%
+#' @import dplyr
+#'
+#' @examples
+#' genome.doub.timing(sample, seg.mat.minor, seg.mat.copy)
+#'
+
+genome.doub.timing <- function(sample, seg.mat.minor, seg.mat.copy,
+                               loss.level = 3
+                               ) {
+  if(loss.level == 2){
+    message("The genotype AA and AB are used")
+  }else{
+    message("The genotype AA, AB, AAA and AAB are used")
+  }
+
+  # define expected chr names
+  chr.names <- c(
+    "1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5", "5.5", "6", "6.5", "7", "7.5", "8", "8.5", "9",
+    "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13.5", "14.5", "15.5", "16", "16.5", "17",
+    "17.5", "18", "18.5", "19", "19.5", "20", "20.5", "21.5", "22.5"
+  )
+  
+  # Remove other samples:
+  sub.minor <- subset(seg.mat.minor, seg.mat.minor[, 1] == sample)
+  sub.major <- subset(seg.mat.copy, seg.mat.copy[, 1] == sample)
+  
+  genotype = function(A, B){
+    if(A == 1 & B == 1){
+      "AB"
+    }else if(A == 2 & B == 1){
+      "AAB"
+    }else if(A == 2 & B == 0){
+      "AA"
+    }else if(A == 3 & B == 0){
+      "AAA"
+    }else{
+      "Other"
+    }
+  }
+  
+  timing = function(genotype, loss.level = loss.level){
+  
+    time = rep(NA, length(genotype))
+    
+    if(loss.level == 2){
+      
+      for(i in 1:length(genotype)){
+        if( genotype[i] %in% c("AA") ){
+          time[i] =  "Before"
+        }else if( genotype[i] %in% c("AB")){
+          time[i] = "After"
+        }else{
+          time[i] = "Unknown"
+        }
+      }
+      
+    }else{
+      for(i in 1:length(genotype)){
+        if( genotype[i] %in% c("AA","AAA") ){
+          time[i] =  "Before"
+        }else if( genotype[i] %in% c("AB","AAB")){
+          time[i] = "After"
+        }else{
+          time[i] = "Unknown"
+        }
+      }
+    }
+    
+    time
+  }
+  
+  #get segment levels.
+  sub.mat = as.data.frame(sub.major) %>%
+    dplyr::rename(CNt = val) %>%
+    left_join( as.data.frame(sub.minor) %>%
+                dplyr::rename(Minor = val) ) %>%
+    mutate(
+      Start = as.numeric(Start),
+      End = as.numeric(End),
+      CNt = as.numeric(CNt),
+      Minor = as.numeric(Minor),
+      Major = CNt - Minor) %>%
+    rowwise() %>%
+    mutate(genotype = genotype(Major, Minor)) %>%
+    mutate(time = timing(genotype, loss.level))
+  
+  sub.mat.summ = sub.mat %>%
+    group_by(time) %>%
+    summarise(len = sum(End - Start)) %>%
+    mutate(seg.prop = len/sum(len))%>%
+    as.data.frame()
+  
+  
+  #Get arms levels
+  sub.mat.arms = sub.mat %>%
+    group_by(Chrom) %>%
+    summarise(
+      CNt = limma::weighted.median(CNt, w = End - Start,  na.rm = TRUE),
+      Minor = limma::weighted.median(Minor, w = End - Start,  na.rm = TRUE),
+      Major = CNt - Minor,
+      genotype = genotype(Major, Minor)
+    ) %>%
+    mutate(time = timing(genotype, loss.level))
+    
+  sub.mat.arms.summ = sub.mat.arms %>%
+    group_by(time) %>%
+    summarise(num = n()) %>%
+    mutate(arm.prop = num/sum(num)) %>%
+    as.data.frame()
+    
+  sub.mat.summ %>%
+    left_join(sub.mat.arms.summ)
+ 
+  GD.timing = data.frame(
+    before = c(sub.mat.summ[sub.mat.summ$time == "Before", "seg.prop"], 
+               sub.mat.arms.summ[sub.mat.summ$time == "Before", "arm.prop"]),
+    after = c(sub.mat.summ[sub.mat.summ$time == "After", "seg.prop"],
+              sub.mat.arms.summ[sub.mat.summ$time == "After", "arm.prop"]),
+    source = c("segments","arms"),
+    sample = sample
+  ) %>%
+    mutate(
+      before = round(before, 5),
+      after = round(after, 5)
+    )
+  
+  sub.mat.arms = sub.mat.arms %>%
+    mutate(Chrom = factor(Chrom, levels = chr.names )) %>%
+    arrange(Chrom) %>%
+    mutate(sample = sample)
+  
+  return(
+    list(
+    GD.timing = GD.timing,
+    sub.mat.arms = sub.mat.arms
+    )
+  )
+  
+}
+
+
+
+
+
+
+
+
+
+
+
 
 
 ###########################################
@@ -310,7 +482,8 @@ get.seg.mat.arm <- function(seg.mat.copy) {
     "9.5", "10", "10.5", "11", "11.5", "12", "12.5", "13.5", "14.5", "15.5", "16", "16.5", "17",
     "17.5", "18", "18.5", "19", "19.5", "20", "20.5", "21.5", "22.5"
   )
-  # TODO Why no 21, 15, 22, 13, 14?
+  # Why no 21, 15, 22, 13, 14? 
+  #see https://www.sciencedirect.com/topics/medicine-and-dentistry/chromosome-identification
   seg.mat.copy.arm[seg.mat.copy.arm[, 2] == 21, 2] <- "21.5"
   seg.mat.copy.arm[seg.mat.copy.arm[, 2] == 15, 2] <- "15.5"
   seg.mat.copy.arm[seg.mat.copy.arm[, 2] == 22, 2] <- "22.5"
